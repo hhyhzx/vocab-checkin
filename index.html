@@ -474,7 +474,7 @@ function loadState() {
     var raw = localStorage.getItem('vc_state');
     if (raw) return JSON.parse(raw);
   } catch(e) {}
-  return { learned: {}, day: 0, mastery: {} };
+  return { learned: {}, day: 0, mastery: {}, completedDates: {} };
 }
 
 function saveState() {
@@ -613,7 +613,9 @@ function renderDayNav() {
   // date label
   var now = new Date();
   document.getElementById('dayDate').textContent =
-    now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日';
+    now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日' +
+    (state.completedDates && state.completedDates[state.day]
+      ? '  |  ✓ ' + state.completedDates[state.day] : '');
 }
 
 function renderProgress() {
@@ -625,13 +627,20 @@ function renderProgress() {
   document.getElementById('headerSub').textContent =
     '已掌握 ' + totalLearned() + ' / ' + VOCAB.length + ' 词';
 
-  // celebrate if all done
-  if (learned === words.length && words.length > 0 && !window._celebratedDay) {
-    window._celebratedDay = state.day;
-    setTimeout(function() {
-      showConfetti();
-      showToast('🎉 胡诗涵，今日任务全部完成！');
-    }, 300);
+  // celebrate if all done, record completion time
+  if (learned === words.length && words.length > 0) {
+    if (!state.completedDates) state.completedDates = {};
+    if (!state.completedDates[state.day]) {
+      state.completedDates[state.day] = new Date().toLocaleString('zh-CN');
+      saveState();
+    }
+    if (!window._celebratedDay) {
+      window._celebratedDay = state.day;
+      setTimeout(function() {
+        showConfetti();
+        showToast('🎉 胡诗涵，今日任务全部完成！');
+      }, 300);
+    }
   }
   if (learned < words.length) {
     window._celebratedDay = -1;
@@ -726,7 +735,11 @@ function renderStats() {
   for (var d = 0; d < TOTAL_DAYS; d++) {
     var done = isDayComplete(d);
     var today = d === state.day;
-    html += '<div class="day-dot' + (done ? ' done' : '') + (today ? ' today' : '') + '" data-day="' + d + '">' + (d + 1) + '</div>';
+    var title = '第' + (d+1) + '天';
+    if (state.completedDates && state.completedDates[d]) {
+      title += ' - 完成于 ' + state.completedDates[d];
+    }
+    html += '<div class="day-dot' + (done ? ' done' : '') + (today ? ' today' : '') + '" data-day="' + d + '" title="' + esc(title) + '">' + (d + 1) + '</div>';
   }
   html += '</div></div>';
 
