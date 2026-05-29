@@ -2,7 +2,7 @@
   "name": "胡诗涵天天词汇打卡",
   "short_name": "词汇打卡",
   "description": "每天30词，轻松搞定中考词汇",
-  "start_url": "vocab_checkin.html",
+  "start_url": "index.html",
   "scope": ".",
   "display": "standalone",
   "orientation": "portrait",

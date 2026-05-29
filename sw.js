@@ -1,7 +1,7 @@
 // Service Worker for 初中英语词汇打卡 PWA
 var CACHE = 'vocab-v1';
 var FILES = [
-  'vocab_checkin.html',
+  'index.html',
   'manifest.json',
   'icon-192.png',
   'icon-512.png',
