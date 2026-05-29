@@ -140,6 +140,7 @@ body {
   white-space:nowrap;
 }
 .word-zh { font-size:15px; color: var(--text2); margin-top:3px; }
+.word-zh-hidden { font-size:13px; color: #cbd5e1; margin-top:3px; font-style:italic; }
 .word-ipa { font-size:13px; color: #94a3b8; margin-top:1px; font-style:italic; }
 .word-mastery { font-size:11px; color:#f59e0b; margin-top:1px; }
 .word-mastery span { color:#94a3b8; }
@@ -686,14 +687,18 @@ function renderWordList() {
       for (var si = 0; si < Math.min(state.mastery[w.id], 5); si++) html += '⭐';
       html += ' <span>' + state.mastery[w.id] + '次</span></div>';
     }
-    html += '<div class="word-zh">' + esc(w.m) + '</div>';
-    if (w.f) html += '<div class="word-forms">' + esc(w.f) + '</div>';
-    if (w.ph && w.ph.length) {
-      html += '<div class="word-phrases">';
-      for (var pi = 0; pi < w.ph.length; pi++) {
-        html += '<span class="phrase-tag">' + esc(w.ph[pi].t) + ' <i>' + esc(w.ph[pi].m) + '</i>' + (w.ph[pi].e ? ' <em>' + esc(w.ph[pi].e) + '</em>' : '') + '</span>';
+    if (learned) {
+      html += '<div class="word-zh">' + esc(w.m) + '</div>';
+      if (w.f) html += '<div class="word-forms">' + esc(w.f) + '</div>';
+      if (w.ph && w.ph.length) {
+        html += '<div class="word-phrases">';
+        for (var pi = 0; pi < w.ph.length; pi++) {
+          html += '<span class="phrase-tag">' + esc(w.ph[pi].t) + ' <i>' + esc(w.ph[pi].m) + '</i>' + (w.ph[pi].e ? ' <em>' + esc(w.ph[pi].e) + '</em>' : '') + '</span>';
+        }
+        html += '</div>';
       }
-      html += '</div>';
+    } else {
+      html += '<div class="word-zh-hidden">🔒 点击答题查看释义</div>';
     }
     html += '</div>';
     html += '<button class="speaker-btn" data-word="' + esc(w.w) + '" title="朗读">🔊</button>';
@@ -701,17 +706,14 @@ function renderWordList() {
   }
   document.getElementById('wordList').innerHTML = html || '<div class="empty"><div class="icon">📭</div>暂无词汇</div>';
 
-  // click handlers
   var cards = document.getElementById('wordList').querySelectorAll('.word-card');
   for (var j = 0; j < cards.length; j++) {
     cards[j].addEventListener('click', function(e) {
-      // ignore clicks on the speaker button
       if (e.target.closest('.speaker-btn')) return;
       var id = this.getAttribute('data-id');
       toggleWord(id);
     });
   }
-  // speaker button handlers
   var spks = document.getElementById('wordList').querySelectorAll('.speaker-btn');
   for (var k = 0; k < spks.length; k++) {
     spks[k].addEventListener('click', function(e) {
@@ -831,13 +833,17 @@ function renderAllWords(filter) {
       for (var si = 0; si < Math.min(state.mastery[w.id], 5); si++) html += '⭐';
       html += ' <span>' + state.mastery[w.id] + '次</span></div>';
     }
-    html += '<div class="word-zh">' + esc(w.m) + '</div>';
-    if (w.ph && w.ph.length) {
-      html += '<div class="word-phrases">';
-      for (var pi = 0; pi < w.ph.length; pi++) {
-        html += '<span class="phrase-tag">' + esc(w.ph[pi].t) + ' <i>' + esc(w.ph[pi].m) + '</i>' + (w.ph[pi].e ? ' <em>' + esc(w.ph[pi].e) + '</em>' : '') + '</span>';
+    if (learned) {
+      html += '<div class="word-zh">' + esc(w.m) + '</div>';
+      if (w.ph && w.ph.length) {
+        html += '<div class="word-phrases">';
+        for (var pi = 0; pi < w.ph.length; pi++) {
+          html += '<span class="phrase-tag">' + esc(w.ph[pi].t) + ' <i>' + esc(w.ph[pi].m) + '</i>' + (w.ph[pi].e ? ' <em>' + esc(w.ph[pi].e) + '</em>' : '') + '</span>';
+        }
+        html += '</div>';
       }
-      html += '</div>';
+    } else {
+      html += '<div class="word-zh-hidden">🔒 点击答题查看释义</div>';
     }
     html += '</div>';
     html += '<button class="speaker-btn" data-word="' + esc(w.w) + '" title="朗读">🔊</button>';
@@ -846,7 +852,6 @@ function renderAllWords(filter) {
   document.getElementById('allWordList').innerHTML =
     html || '<div class="empty"><div class="icon">🔎</div>没有匹配的单词</div>';
 
-  // click handlers
   var cards = document.getElementById('allWordList').querySelectorAll('.word-card');
   for (var j = 0; j < cards.length; j++) {
     cards[j].addEventListener('click', function(e) {
@@ -857,7 +862,6 @@ function renderAllWords(filter) {
       renderAllWords(activeFilter ? activeFilter.getAttribute('data-filter') : 'all');
     });
   }
-  // speaker buttons
   var spks = document.getElementById('allWordList').querySelectorAll('.speaker-btn');
   for (var k = 0; k < spks.length; k++) {
     spks[k].addEventListener('click', function(e) {
