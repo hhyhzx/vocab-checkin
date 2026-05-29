@@ -587,12 +587,26 @@ function speakWord(word, btn, forms, phrases, meaning) {
     }
   }
 
+  // floating overlay for speech text
+  var overlay = document.getElementById('speechOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'speechOverlay';
+    overlay.style.cssText = 'position:fixed;bottom:120px;left:50%;transform:translateX(-50%);background:rgba(30,41,59,.92);color:#fff;padding:14px 24px;border-radius:16px;font-size:17px;z-index:300;max-width:90vw;text-align:center;pointer-events:none;transition:opacity .2s;box-shadow:0 8px 24px rgba(0,0,0,.3);';
+    document.body.appendChild(overlay);
+  }
+  overlay.style.opacity = '1';
+  overlay.textContent = '';
+
   function speakNext(idx) {
     if (idx >= queue.length) {
       if (btn) btn.classList.remove('speaking');
+      overlay.style.opacity = '0';
+      setTimeout(function() { overlay.textContent = ''; }, 300);
       return;
     }
     var item = queue[idx];
+    overlay.textContent = item.text;
     var utter = new SpeechSynthesisUtterance(item.text);
     utter.lang = item.lang;
     utter.rate = item.rate;
