@@ -372,6 +372,7 @@ body {
   <div class="header">
     <h1>📚 胡诗涵英语打卡</h1>
     <div class="sub" id="headerSub">每天30词，轻松搞定中考词汇</div>
+    <div class="sub" id="headerTimer" style="font-size:12px;opacity:.7;margin-top:2px;"></div>
   </div>
 
   <!-- day nav -->
@@ -633,6 +634,24 @@ function renderProgress() {
   var words = getDayWords(state.day);
   var learned = countDayLearned(state.day);
   var pct = words.length > 0 ? Math.round(learned / words.length * 100) : 0;
+
+  // update timer
+  var timerEl = document.getElementById('headerTimer');
+  if (timerEl && state.dayStartTimes && state.dayStartTimes[state.day] && !isDayComplete(state.day)) {
+    var elapsed = Math.round((Date.now() - state.dayStartTimes[state.day]) / 1000);
+    var min = Math.floor(elapsed / 60);
+    var sec = elapsed % 60;
+    var need = 15 - min;
+    if (need > 0) {
+      timerEl.textContent = '⏱ ' + min + '分' + sec + '秒 (还需' + need + '分钟达标)';
+      timerEl.style.color = '#fbbf24';
+    } else {
+      timerEl.textContent = '⏱ ' + min + '分' + sec + '秒 ✓ 已达标';
+      timerEl.style.color = '#4ade80';
+    }
+  } else if (timerEl) {
+    timerEl.textContent = '';
+  }
   document.getElementById('progressFill').style.width = pct + '%';
   document.getElementById('progressText').textContent = '今日进度: ' + learned + '/' + words.length;
   document.getElementById('headerSub').textContent =
@@ -640,10 +659,33 @@ function renderProgress() {
 
   // celebrate if all done, record duration
   if (learned === words.length && words.length > 0) {
+    var start = (state.dayStartTimes && state.dayStartTimes[state.day]) || Date.now();
+    var secs = Math.round((Date.now() - start) / 1000);
+
+    // must take at least 15 minutes
+    if (secs < 900 && !state.dayDurations[state.day]) {
+      if (!window._speedWarned) {
+        window._speedWarned = state.day;
+        setTimeout(function() {
+          // reset all learned words for this day
+          var dayWords = getDayWords(state.day);
+          for (var i = 0; i < dayWords.length; i++) {
+            delete state.learned[dayWords[i].id];
+          }
+          delete state.dayStartTimes[state.day];
+          delete state.dayDurations[state.day];
+          delete state.completedDates[state.day];
+          saveState();
+          refreshAll();
+          showToast('⚠️ 打卡太快了！少于15分钟需重新打卡');
+        }, 400);
+      }
+      return;
+    }
+
+    window._speedWarned = -1;
     if (!state.dayDurations) state.dayDurations = {};
     if (!state.dayDurations[state.day]) {
-      var start = (state.dayStartTimes && state.dayStartTimes[state.day]) || Date.now();
-      var secs = Math.round((Date.now() - start) / 1000);
       var dur;
       if (secs < 60) dur = secs + '秒';
       else if (secs < 3600) dur = Math.floor(secs / 60) + '分' + (secs % 60) + '秒';
@@ -664,6 +706,7 @@ function renderProgress() {
   }
   if (learned < words.length) {
     window._celebratedDay = -1;
+    window._speedWarned = -1;
   }
 }
 
@@ -1105,6 +1148,9 @@ document.getElementById('wordList').addEventListener('touchend', function(e) {
 
 // ── init ─────────────────────────────────────────────────────────
 refreshAll();
+setInterval(function() {
+  if (currentTab === 'study') renderProgress();
+}, 10000);  // update timer every 10s
 </script>
 </body>
 </html>
