@@ -1,0 +1,24 @@
+{
+  "name": "胡诗涵天天词汇打卡",
+  "short_name": "词汇打卡",
+  "description": "每天30词，轻松搞定中考词汇",
+  "start_url": "vocab_checkin.html",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f0f4f8",
+  "theme_color": "#4A6CF7",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "lang": "zh-CN"
+}
