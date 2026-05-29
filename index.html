@@ -371,7 +371,6 @@ body {
   <div class="header">
     <h1>📚 胡诗涵英语打卡</h1>
     <div class="sub" id="headerSub">每天30词，轻松搞定中考词汇</div>
-    <button id="btnInstall" style="margin-top:8px;padding:8px 20px;border:2px solid #fff;border-radius:20px;background:rgba(255,255,255,.15);color:#fff;font-size:13px;font-weight:600;cursor:pointer;">📲 安装到桌面</button>
   </div>
 
   <!-- day nav -->
@@ -1020,40 +1019,6 @@ function formatPct(part, total) {
   if (total === 0) return '0%';
   return Math.round(part / total * 100) + '%';
 }
-
-// ── PWA install button ──────────────────────────────────────────
-var deferredPrompt = null;
-window.addEventListener('beforeinstallprompt', function(e) {
-  e.preventDefault();
-  deferredPrompt = e;
-  var btn = document.getElementById('btnInstall');
-  if (btn) btn.style.display = 'inline-block';
-});
-
-document.getElementById('btnInstall').addEventListener('click', function() {
-  if (deferredPrompt) {
-    deferredPrompt.prompt();
-    deferredPrompt.userChoice.then(function(result) {
-      if (result.outcome === 'accepted') {
-        document.getElementById('btnInstall').textContent = '✓ 已安装';
-      }
-      deferredPrompt = null;
-    });
-  } else {
-    // show manual instructions
-    var ua = navigator.userAgent;
-    var tip = '';
-    if (/iphone|ipad|ipod/i.test(ua)) {
-      tip = '点底部 📤 分享 → 添加到主屏幕';
-    } else {
-      tip = '点浏览器右上角 ⋮ 菜单 → 添加到主屏幕';
-    }
-    alert('请按下面步骤安装：\n\n1. ' + tip + '\n2. 确认添加\n\n安装后桌面就有图标了');
-  }
-});
-
-// always show install button
-document.getElementById('btnInstall').style.display = 'inline-block';
 
 // ── event bindings ───────────────────────────────────────────────
 document.getElementById('btnPrev').addEventListener('click', function() {
