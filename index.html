@@ -447,7 +447,6 @@ body {
       <span class="errors-count" id="errorsCount">错题: 0</span>
       <div class="errors-actions">
         <button class="btn-retry-all" id="btnRetryAll">🔄 全部重测</button>
-        <button class="btn-clear-all" id="btnClearErrors">🗑 清空</button>
       </div>
     </div>
     <div class="word-list" id="errorWordList"></div>
@@ -1260,17 +1259,6 @@ document.getElementById('btnRetryAll').addEventListener('click', function() {
   var firstId = errorIds[0];
   showQuiz(firstId);
 });
-document.getElementById('btnClearErrors').addEventListener('click', function() {
-  var count = Object.keys(state.errors || {}).length;
-  if (count === 0) { showToast('没有错题可清空'); return; }
-  showConfirm('确定要清空所有 ' + count + ' 道错题吗？', function() {
-    state.errors = {};
-    saveState();
-    renderErrors();
-    showToast('错题本已清空');
-  });
-});
-
 // ── swipe support ────────────────────────────────────────────────
 var touchStartX = 0;
 var touchStartY = 0;
