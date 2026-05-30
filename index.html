@@ -1084,6 +1084,13 @@ function switchTab(tab) {
   document.getElementById('allWordsWrap').style.display = showAll ? '' : 'none';
   document.getElementById('errorsWrap').style.display = showErrors ? '' : 'none';
 
+  // Toggle iOS install tip: only show on study tab
+  var tip = document.getElementById('installTip');
+  if (tip) {
+    var dismissed = localStorage.getItem('vc_ios_tip_dismissed');
+    tip.style.display = (showStudy && !dismissed) ? 'block' : 'none';
+  }
+
   if (showStats) renderStats();
   if (showAll) {
     var activeFilter = document.querySelector('.filter-chip.active');
