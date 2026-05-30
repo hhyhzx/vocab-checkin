@@ -928,12 +928,12 @@ function renderStats() {
   var resetBtn = document.getElementById('btnReset');
   if (resetBtn) {
     resetBtn.addEventListener('click', function() {
-      showConfirm('确定要清除所有学习记录吗？此操作不可恢复。', function() {
-        state = { learned: {}, day: 0, mastery: state.mastery || {}, errors: state.errors || {} };
+      showConfirm('确定要清除所有数据重新开始吗？\n\n这将清空：学习记录、积分、错题本、掌握次数\n\n此操作不可恢复。', function() {
+        state = { learned: {}, day: 0, mastery: {}, completedDates: {}, dayDurations: {}, errors: {}, points: 0, lastCompletedDate: '' };
         saveState();
         switchTab('study');
         refreshAll();
-        showToast('学习记录已重置，错题本和掌握次数保留');
+        showToast('✅ 数据已重置，从今天开始！');
       });
     });
   }
