@@ -532,7 +532,7 @@ function loadState() {
     var raw = localStorage.getItem('vc_state');
     if (raw) return JSON.parse(raw);
   } catch(e) {}
-  return { learned: {}, day: 0, mastery: {}, completedDates: {}, dayDurations: {}, errors: {}, points: 0, lastCompletedDate: '' };
+  return { learned: {}, day: 0, mastery: {}, completedDates: {}, dayDurations: {}, errors: {}, points: 0, lastCompletedDate: '', streakDays: 0 };
 }
 
 function saveState() {
@@ -544,6 +544,17 @@ function saveState() {
 var state = loadState();
 if (state.day >= TOTAL_DAYS) state.day = TOTAL_DAYS - 1;
 if (state.day < 0) state.day = 0;
+
+// ── migrate old error format {id: count} → {id: {count, streak, lastDate}} ──
+if (state.errors) {
+  var errorIds = Object.keys(state.errors);
+  for (var mi = 0; mi < errorIds.length; mi++) {
+    var eid = errorIds[mi];
+    if (typeof state.errors[eid] === 'number') {
+      state.errors[eid] = { count: state.errors[eid], streak: 0, lastDate: '' };
+    }
+  }
+}
 
 // ── helpers ──────────────────────────────────────────────────────
 function getDayWords(dayIdx) {
@@ -752,13 +763,38 @@ function renderProgress() {
       state.completedDates = state.completedDates || {};
       state.completedDates[state.day] = new Date().toLocaleString('zh-CN');
 
-      // -- points system --
+      // -- points system with progressive streak --
       var today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
       var ptsMsg = '';
+
+      // Compute current streak (consecutive completed days ending at yesterday or today)
+      var streakCount = 0;
+      if (state.completedDates) {
+        var checkDate = new Date(today);
+        while (true) {
+          var key = checkDate.toISOString().slice(0, 10);
+          var found = false;
+          // Look through all completed day indices to find one matching this date
+          var cdKeys = Object.keys(state.completedDates);
+          for (var ci = 0; ci < cdKeys.length; ci++) {
+            var cdDate = state.completedDates[cdKeys[ci]];
+            if (cdDate && cdDate.slice(0, 10) === key) { found = true; break; }
+          }
+          if (found) { streakCount++; checkDate.setDate(checkDate.getDate() - 1); }
+          else break;
+        }
+      }
+      state.streakDays = streakCount;
+
+      var basePoints = 10;
+      var bonusPoints = Math.max(0, streakCount - 1) * 5; // +5 per consecutive day beyond first
+      var totalAward = basePoints + bonusPoints;
+
       if (!state.lastCompletedDate) {
         // first time ever
-        state.points = (state.points || 0) + 10;
-        ptsMsg = ' +10积分';
+        state.points = (state.points || 0) + totalAward;
+        ptsMsg = ' +' + totalAward + '积分（首次打卡）';
+        state.streakDays = 1;
       } else if (state.lastCompletedDate === today) {
         // already completed today, no change
       } else {
@@ -766,20 +802,24 @@ function renderProgress() {
         var curr = new Date(today);
         var daysSince = Math.round((curr - last) / 86400000);
         if (daysSince === 1) {
-          // consecutive: award 10
-          state.points = (state.points || 0) + 10;
-          ptsMsg = ' +10积分（连续打卡）';
+          // consecutive
+          state.points = (state.points || 0) + totalAward;
+          if (bonusPoints > 0) {
+            ptsMsg = ' +' + totalAward + '积分（连续' + (streakCount + 1) + '天！含' + bonusPoints + '加成）';
+          } else {
+            ptsMsg = ' +' + totalAward + '积分（连续打卡）';
+          }
         } else if (daysSince > 1) {
-          // missed days penalty: 10+20+30+... per missed day
+          // missed days penalty
           var missed = daysSince - 1;
           var penalty = 0;
           for (var p = 1; p <= missed; p++) { penalty += p * 10; }
           state.points = Math.max(0, (state.points || 0) - penalty);
-          state.points += 10; // today's reward
-          ptsMsg = ' 连续打卡中断！扣' + penalty + '分，+10今日奖励';
+          state.points += basePoints; // only base points after break
+          ptsMsg = ' 连续打卡中断' + missed + '天！扣' + penalty + '分，+10今日基础奖励';
         }
       }
-      if (daysSince !== 0) {
+      if (state.lastCompletedDate !== today) {
         state.lastCompletedDate = today;
       }
       // protect against negative
@@ -887,8 +927,8 @@ function renderStats() {
   html += '</div>';
 
   html += '<div class="stat-row">';
-  html += '<div class="stat-card"><div class="stat-big">' + (streak || 0) + ' 🔥</div><div class="stat-label">连续打卡</div></div>';
-  html += '<div class="stat-card"><div class="stat-big" style="font-size:14px;color:var(--text2);">📋 规则</div><div class="stat-label" style="font-size:12px;">每日+10分 | 断签扣分递增<br>中断1天-10 2天-30 3天-60...</div></div>';
+  html += '<div class="stat-card"><div class="stat-big">' + (state.streakDays || streak || 0) + ' 🔥</div><div class="stat-label">连续打卡</div></div>';
+  html += '<div class="stat-card"><div class="stat-big" style="font-size:13px;color:var(--text2);">📋 积分规则</div><div class="stat-label" style="font-size:11px;">基础+10分/天 | 连续+5加成/天<br>例：连续3天=10+15+20=45分<br>📝 纠错本: 连续7天正确才能清除</div></div>';
   html += '</div>';
 
   // day grid
@@ -929,7 +969,7 @@ function renderStats() {
   if (resetBtn) {
     resetBtn.addEventListener('click', function() {
       showConfirm('确定要清除所有数据重新开始吗？\n\n这将清空：学习记录、积分、错题本、掌握次数\n\n此操作不可恢复。', function() {
-        state = { learned: {}, day: 0, mastery: {}, completedDates: {}, dayDurations: {}, errors: {}, points: 0, lastCompletedDate: '' };
+        state = { learned: {}, day: 0, mastery: {}, completedDates: {}, dayDurations: {}, errors: {}, points: 0, lastCompletedDate: '', streakDays: 0 };
         saveState();
         switchTab('study');
         refreshAll();
@@ -1025,16 +1065,30 @@ function renderErrors() {
     return;
   }
 
-  // Sort by error count descending (most wrong first)
-  errorIds.sort(function(a, b) { return (state.errors[b] || 0) - (state.errors[a] || 0); });
+  // Sort: active streak words first (lower remaining days = closer to clearing), then by error count
+  errorIds.sort(function(a, b) {
+    var ea = state.errors[a], eb = state.errors[b];
+    var ca = (ea && typeof ea === 'object') ? ea.count : (ea || 0);
+    var cb = (eb && typeof eb === 'object') ? eb.count : (eb || 0);
+    var sa = (ea && typeof ea === 'object' && ea.streak) ? ea.streak : 0;
+    var sb = (eb && typeof eb === 'object' && eb.streak) ? eb.streak : 0;
+    if (sa > 0 && sb === 0) return -1;
+    if (sb > 0 && sa === 0) return 1;
+    if (sa > 0 && sb > 0) return (7 - sa) - (7 - sb); // closer to clearing first
+    return cb - ca; // higher error count first
+  });
 
   var html = '';
   for (var i = 0; i < errorIds.length; i++) {
     var id = errorIds[i];
     var w = findWordById(id);
     if (!w) continue;
-    var errCount = state.errors[id] || 1;
-    html += '<div class="word-card error-card" data-id="' + w.id + '">';
+    var errInfo = state.errors[id];
+    var errCount = (errInfo && typeof errInfo === 'object') ? errInfo.count : (errInfo || 1);
+    var errStreak = (errInfo && typeof errInfo === 'object' && errInfo.streak) ? errInfo.streak : 0;
+    html += '<div class="word-card error-card" data-id="' + w.id + '"';
+    if (errStreak > 0) html += ' style="border-left-color:#f59e0b;"';
+    html += '>';
     html += '<div class="check-circle">✗</div>';
     html += '<div class="word-body">';
     html += '<div class="word-row">';
@@ -1046,6 +1100,9 @@ function renderErrors() {
     if (w.ipa) html += '<div class="word-ipa">/' + esc(w.ipa) + '/</div>';
     html += '<div class="word-zh">' + esc(w.m) + '</div>';
     if (w.f) html += '<div class="word-forms">' + esc(w.f) + '</div>';
+    if (errStreak > 0) {
+      html += '<div class="error-count" style="color:#f59e0b;">🔄 连续正确 ' + errStreak + '/7 天</div>';
+    }
     html += '</div>';
     html += '<button class="speaker-btn" data-word="' + esc(w.w) + '" title="朗读">🔊</button>';
     html += '</div>';
@@ -1197,10 +1254,39 @@ function showQuiz(id) {
         state.mastery[id] = (state.mastery[id] || 0) + 1;
         var stars = '';
         for (var s = 0; s < Math.min(state.mastery[id], 5); s++) stars += '⭐';
-        feedback.innerHTML = '<span style="color:#10B981;">胡诗涵，你真棒！ ' + stars + ' (' + state.mastery[id] + '次)</span>';
         state.learned[id] = true;
-        // remove from errors if corrected
-        if (state.errors && state.errors[id]) { delete state.errors[id]; }
+
+        // Error notebook: track 7-day consecutive correct streak
+        var errStreakMsg = '';
+        if (state.errors && state.errors[id]) {
+          var errInfo = state.errors[id];
+          var today = new Date().toISOString().slice(0, 10);
+          if (errInfo.lastDate === today) {
+            // already answered correctly today, no streak change
+          } else {
+            var lastErr = errInfo.lastDate ? new Date(errInfo.lastDate) : null;
+            var currErr = new Date(today);
+            if (lastErr) {
+              var errDiff = Math.round((currErr - lastErr) / 86400000);
+              if (errDiff === 1) {
+                errInfo.streak = (errInfo.streak || 0) + 1;
+              } else {
+                errInfo.streak = 1;
+              }
+            } else {
+              errInfo.streak = 1;
+            }
+            errInfo.lastDate = today;
+          }
+          if (errInfo.streak >= 7) {
+            delete state.errors[id];
+            errStreakMsg = '<br><span style="color:#10B981;">🎉 连续7天正确！已从纠错本移除</span>';
+          } else {
+            errStreakMsg = '<br><span style="color:#f59e0b;">📝 纠错本还需连续正确 ' + (7 - errInfo.streak) + ' 天 (已' + errInfo.streak + '/7)</span>';
+          }
+        }
+
+        feedback.innerHTML = '<span style="color:#10B981;">胡诗涵，你真棒！ ' + stars + ' (' + state.mastery[id] + '次)</span>' + errStreakMsg;
         saveState();
         // speak after short delay
         var w = word;
@@ -1213,11 +1299,18 @@ function showQuiz(id) {
         }, 1200);
       } else {
         this.classList.add('chosen-wrong');
-        // add to error notebook
+        // add to error notebook with streak tracking
         if (!state.errors) state.errors = {};
-        state.errors[id] = (state.errors[id] || 0) + 1;
+        var errInfo = state.errors[id];
+        if (!errInfo || typeof errInfo === 'number') {
+          errInfo = { count: typeof errInfo === 'number' ? errInfo : 0, streak: 0, lastDate: '' };
+        }
+        errInfo.count += 1;
+        errInfo.streak = 0;
+        errInfo.lastDate = '';
+        state.errors[id] = errInfo;
         saveState();
-        feedback.innerHTML = '<span style="color:#EF4444;">已加入错题本 (错误' + state.errors[id] + '次) | 正确答案：' + esc(correct) + '</span>';
+        feedback.innerHTML = '<span style="color:#EF4444;">已加入错题本 (错误' + errInfo.count + '次) | 正确答案：' + esc(correct) + '</span>';
         // speak the correct word
         var w = word;
         setTimeout(function() { speakWord(w.w, null, null, null, w.m, w.ipa); }, 300);
