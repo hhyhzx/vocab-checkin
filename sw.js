@@ -1,5 +1,5 @@
 // Service Worker for 初中英语词汇打卡 PWA
-var CACHE = 'vocab-v3';
+var CACHE = 'vocab-v4';
 var FILES = [
   'index.html',
   'manifest.json',
