@@ -365,6 +365,31 @@ body {
 /* empty state */
 .empty { text-align:center; padding:40px 20px; color: var(--text2); }
 .empty .icon { font-size:48px; margin-bottom:12px; }
+
+/* error notebook */
+.errors-header { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:var(--card); border-bottom:1px solid var(--border); }
+.errors-count { font-size:14px; color:var(--danger); font-weight:600; }
+.errors-actions { display:flex; gap:8px; }
+.errors-actions button {
+  padding:6px 14px; border:1px solid var(--border); border-radius:16px;
+  background:#fff; font-size:12px; cursor:pointer; transition:all .15s;
+}
+.errors-actions button:active { background:var(--bg); }
+.errors-actions .btn-retry-all { border-color:var(--primary); color:var(--primary); }
+.errors-actions .btn-clear-all { border-color:var(--danger); color:var(--danger); }
+.error-card {
+  display:flex; align-items:center; gap:12px;
+  background: var(--card); border-radius:var(--radius);
+  padding:14px 16px; margin-bottom:8px;
+  box-shadow: var(--shadow); cursor:pointer;
+  transition:all .15s; border-left:4px solid var(--danger);
+}
+.error-card:active { transform:scale(.98); }
+.error-card .error-badge {
+  font-size:10px; color:#fff; background:var(--danger);
+  padding:2px 8px; border-radius:10px; white-space:nowrap;
+}
+.error-card .error-count { font-size:11px; color:var(--danger); margin-top:2px; }
 </style>
 </head>
 <body>
@@ -416,6 +441,18 @@ body {
     <div class="word-list" id="allWordList"></div>
   </div>
 
+  <!-- error notebook tab -->
+  <div id="errorsWrap" style="display:none;flex:1;overflow-y:auto;">
+    <div class="errors-header">
+      <span class="errors-count" id="errorsCount">错题: 0</span>
+      <div class="errors-actions">
+        <button class="btn-retry-all" id="btnRetryAll">🔄 全部重测</button>
+        <button class="btn-clear-all" id="btnClearErrors">🗑 清空</button>
+      </div>
+    </div>
+    <div class="word-list" id="errorWordList"></div>
+  </div>
+
   <!-- tab bar -->
   <nav class="tab-bar">
     <div class="tab-item active" data-tab="study">
@@ -426,6 +463,9 @@ body {
     </div>
     <div class="tab-item" data-tab="all">
       <span class="tab-icon">🔍</span>全部
+    </div>
+    <div class="tab-item" data-tab="errors">
+      <span class="tab-icon">📝</span>纠错
     </div>
   </nav>
 </div>
@@ -476,7 +516,7 @@ function loadState() {
     var raw = localStorage.getItem('vc_state');
     if (raw) return JSON.parse(raw);
   } catch(e) {}
-  return { learned: {}, day: 0, mastery: {}, completedDates: {}, dayDurations: {} };
+  return { learned: {}, day: 0, mastery: {}, completedDates: {}, dayDurations: {}, errors: {} };
 }
 
 function saveState() {
@@ -873,6 +913,63 @@ function renderAllWords(filter) {
   }
 }
 
+function renderErrors() {
+  var errorIds = Object.keys(state.errors || {});
+  var count = errorIds.length;
+  document.getElementById('errorsCount').textContent = '错题: ' + count + ' 个';
+
+  if (count === 0) {
+    document.getElementById('errorWordList').innerHTML =
+      '<div class="empty"><div class="icon">🎉</div><div>太棒了！没有错题</div></div>';
+    return;
+  }
+
+  // Sort by error count descending (most wrong first)
+  errorIds.sort(function(a, b) { return (state.errors[b] || 0) - (state.errors[a] || 0); });
+
+  var html = '';
+  for (var i = 0; i < errorIds.length; i++) {
+    var id = errorIds[i];
+    var w = findWordById(id);
+    if (!w) continue;
+    var errCount = state.errors[id] || 1;
+    html += '<div class="word-card error-card" data-id="' + w.id + '">';
+    html += '<div class="check-circle">✗</div>';
+    html += '<div class="word-body">';
+    html += '<div class="word-row">';
+    html += '<span class="word-en">' + esc(w.w) + '</span>';
+    html += '<span class="word-pos">' + esc(w.p) + '</span>';
+    html += '<span class="error-badge">错' + errCount + '次</span>';
+    if (w.star) html += '<span class="star-badge">⭐</span>';
+    html += '</div>';
+    if (w.ipa) html += '<div class="word-ipa">/' + esc(w.ipa) + '/</div>';
+    html += '<div class="word-zh">' + esc(w.m) + '</div>';
+    if (w.f) html += '<div class="word-forms">' + esc(w.f) + '</div>';
+    html += '</div>';
+    html += '<button class="speaker-btn" data-word="' + esc(w.w) + '" title="朗读">🔊</button>';
+    html += '</div>';
+  }
+  document.getElementById('errorWordList').innerHTML = html;
+
+  var cards = document.getElementById('errorWordList').querySelectorAll('.word-card');
+  for (var j = 0; j < cards.length; j++) {
+    cards[j].addEventListener('click', function(e) {
+      if (e.target.closest('.speaker-btn')) return;
+      var id = this.getAttribute('data-id');
+      showQuiz(id);
+    });
+  }
+  var spks = document.getElementById('errorWordList').querySelectorAll('.speaker-btn');
+  for (var k = 0; k < spks.length; k++) {
+    spks[k].addEventListener('click', function(e) {
+      e.stopPropagation();
+      var id = this.closest('.word-card').getAttribute('data-id');
+      var word = findWordById(id);
+      speakWord(this.getAttribute('data-word'), this, word ? word.f : '', word ? word.ph : null, word ? word.m : '');
+    });
+  }
+}
+
 function renderBatchButton() {
   var words = getDayWords(state.day);
   var learned = countDayLearned(state.day);
@@ -905,6 +1002,7 @@ function switchTab(tab) {
   var showStudy = tab === 'study';
   var showStats = tab === 'stats';
   var showAll = tab === 'all';
+  var showErrors = tab === 'errors';
 
   document.getElementById('wordList').style.display = showStudy ? '' : 'none';
   document.getElementById('batchWrap').style.display = showStudy ? '' : 'none';
@@ -913,12 +1011,14 @@ function switchTab(tab) {
 
   document.getElementById('statsWrap').style.display = showStats ? '' : 'none';
   document.getElementById('allWordsWrap').style.display = showAll ? '' : 'none';
+  document.getElementById('errorsWrap').style.display = showErrors ? '' : 'none';
 
   if (showStats) renderStats();
   if (showAll) {
     var activeFilter = document.querySelector('.filter-chip.active');
     renderAllWords(activeFilter ? activeFilter.getAttribute('data-filter') : 'all');
   }
+  if (showErrors) renderErrors();
   if (showStudy) refreshAll();
 }
 
@@ -998,6 +1098,8 @@ function showQuiz(id) {
         for (var s = 0; s < Math.min(state.mastery[id], 5); s++) stars += '⭐';
         feedback.innerHTML = '<span style="color:#10B981;">胡诗涵，你真棒！ ' + stars + ' (' + state.mastery[id] + '次)</span>';
         state.learned[id] = true;
+        // remove from errors if corrected
+        if (state.errors && state.errors[id]) { delete state.errors[id]; }
         saveState();
         // speak after short delay
         var w = word;
@@ -1006,16 +1108,22 @@ function showQuiz(id) {
           var modal = document.getElementById('quizModal');
           if (modal) modal.remove();
           refreshAll();
+          if (currentTab === 'errors') renderErrors();
         }, 1200);
       } else {
         this.classList.add('chosen-wrong');
-        feedback.innerHTML = '<span style="color:#EF4444;">不要灰心，要相信自己！答案是：' + esc(correct) + '</span>';
+        // add to error notebook
+        if (!state.errors) state.errors = {};
+        state.errors[id] = (state.errors[id] || 0) + 1;
+        saveState();
+        feedback.innerHTML = '<span style="color:#EF4444;">已加入错题本 (错误' + state.errors[id] + '次) | 正确答案：' + esc(correct) + '</span>';
         // speak the correct word
         var w = word;
         setTimeout(function() { speakWord(w.w, null, null, null, w.m); }, 300);
         setTimeout(function() {
           var modal = document.getElementById('quizModal');
           if (modal) modal.remove();
+          if (currentTab === 'errors') renderErrors();
         }, 2000);
       }
     });
@@ -1086,6 +1194,25 @@ document.querySelectorAll('.filter-chip').forEach(function(el) {
 document.getElementById('searchInput').addEventListener('input', function() {
   var activeFilter = document.querySelector('.filter-chip.active');
   renderAllWords(activeFilter ? activeFilter.getAttribute('data-filter') : 'all');
+});
+
+// ── error notebook buttons ────────────────────────────────────────
+document.getElementById('btnRetryAll').addEventListener('click', function() {
+  var errorIds = Object.keys(state.errors || {});
+  if (errorIds.length === 0) { showToast('没有错题需要重测'); return; }
+  // pick the first error word and quiz it
+  var firstId = errorIds[0];
+  showQuiz(firstId);
+});
+document.getElementById('btnClearErrors').addEventListener('click', function() {
+  var count = Object.keys(state.errors || {}).length;
+  if (count === 0) return;
+  if (confirm('确定要清空所有 ' + count + ' 道错题吗？')) {
+    state.errors = {};
+    saveState();
+    renderErrors();
+    showToast('错题本已清空');
+  }
 });
 
 // ── swipe support ────────────────────────────────────────────────
