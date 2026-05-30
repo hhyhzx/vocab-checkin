@@ -1121,6 +1121,166 @@ function toggleWord(id) {
   showQuiz(id);
 }
 
+function strSimilarity(a, b) {
+  a = a.toLowerCase().replace(/[^a-z]/g, '').trim();
+  b = b.toLowerCase().replace(/[^a-z]/g, '').trim();
+  if (!a || !b) return 0;
+  if (a === b) return 100;
+  var m = a.length, n = b.length;
+  var dp = [];
+  for (var i = 0; i <= m; i++) { dp[i] = [i]; }
+  for (var j = 0; j <= n; j++) { dp[0][j] = j; }
+  for (var i = 1; i <= m; i++) {
+    for (var j = 1; j <= n; j++) {
+      dp[i][j] = Math.min(
+        dp[i-1][j] + 1, dp[i][j-1] + 1,
+        dp[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1)
+      );
+    }
+  }
+  return Math.round((1 - dp[m][n] / Math.max(m, n)) * 100);
+}
+
+function showPronounceUI(id) {
+  var word = findWordById(id);
+  if (!word) return;
+  var feedback = document.getElementById('quizFeedback');
+  var quizBox = document.querySelector('.quiz-box');
+  if (!quizBox) return;
+
+  // Replace options area with pronunciation UI
+  var optsContainer = quizBox.querySelector('div[style*="flex-direction:column"]');
+  if (optsContainer) optsContainer.remove();
+
+  var html = '<div id="pronounceArea" style="text-align:center;margin-top:8px;">';
+  html += '<div style="font-size:13px;color:var(--text2);margin-bottom:8px;">🎤 请大声朗读单词</div>';
+  html += '<button id="btnMic" style="width:64px;height:64px;border-radius:50%;border:3px solid var(--primary);background:#eef2ff;font-size:30px;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;margin:0 auto;">🎙️</button>';
+  html += '<div id="pronounceResult" style="margin-top:10px;font-size:14px;min-height:24px;"></div>';
+  html += '<div id="pronounceActions" style="display:flex;gap:8px;justify-content:center;margin-top:8px;"></div>';
+  html += '</div>';
+  quizBox.insertAdjacentHTML('beforeend', html);
+
+  var micBtn = document.getElementById('btnMic');
+  var resultEl = document.getElementById('pronounceResult');
+  var actionsEl = document.getElementById('pronounceActions');
+
+  function showActions(passed) {
+    if (passed) {
+      actionsEl.innerHTML = '<span style="color:#10B981;font-weight:600;">🎉 发音通过！</span>';
+    } else {
+      actionsEl.innerHTML = '<button class="btn-primary" id="btnRetryPronounce" style="font-size:13px;padding:8px 20px;">🔄 重试</button>';
+      actionsEl.innerHTML += ' <button class="btn-ghost" id="btnSkipPronounce" style="font-size:13px;padding:8px 20px;">跳过</button>';
+      document.getElementById('btnRetryPronounce').addEventListener('click', function() {
+        startListening();
+      });
+      document.getElementById('btnSkipPronounce').addEventListener('click', function() {
+        doPass(); // skip but still pass (don't penalize for no mic)
+      });
+    }
+  }
+
+  function doPass() {
+    if (!state.mastery) state.mastery = {};
+    state.mastery[id] = (state.mastery[id] || 0) + 1;
+    state.learned[id] = true;
+    if (state.errors && state.errors[id]) { delete state.errors[id]; }
+    saveState();
+    speakWord(word.w, null, word.f, word.ph, word.m);
+    showConfetti();
+    setTimeout(function() {
+      var modal = document.getElementById('quizModal');
+      if (modal) modal.remove();
+      refreshAll();
+      if (currentTab === 'errors') renderErrors();
+    }, 1000);
+  }
+
+  function doFail() {
+    if (!state.errors) state.errors = {};
+    state.errors[id] = (state.errors[id] || 0) + 1;
+    saveState();
+    resultEl.innerHTML = '<span style="color:#EF4444;">发音不准确，已加入错题本</span>';
+    speakWord(word.w, null, null, null, word.m);
+    setTimeout(function() {
+      var modal = document.getElementById('quizModal');
+      if (modal) modal.remove();
+      if (currentTab === 'errors') renderErrors();
+    }, 2000);
+  }
+
+  function startListening() {
+    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      resultEl.innerHTML = '<span style="color:#EF4444;">你的浏览器不支持语音识别</span>';
+      showActions(false);
+      return;
+    }
+    micBtn.style.background = '#fef2f2';
+    micBtn.style.borderColor = 'var(--danger)';
+    micBtn.textContent = '🔴';
+    resultEl.textContent = '正在聆听...';
+
+    var recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.maxAlternatives = 3;
+    recognition.interimResults = false;
+
+    recognition.onresult = function(event) {
+      micBtn.style.background = '#eef2ff';
+      micBtn.style.borderColor = 'var(--primary)';
+      micBtn.textContent = '🎙️';
+
+      var bestScore = 0;
+      var bestText = '';
+      for (var i = 0; i < event.results[0].length; i++) {
+        var text = event.results[0][i].transcript;
+        var score = strSimilarity(text, word.w);
+        if (score > bestScore) { bestScore = score; bestText = text; }
+      }
+      // Also check against just the first part if multi-word
+      var mainWord = word.w.split('/')[0].split('(')[0].trim();
+      var mainScore = strSimilarity(bestText, mainWord);
+      bestScore = Math.max(bestScore, mainScore);
+
+      if (bestScore >= 90) {
+        resultEl.innerHTML = '<span style="color:#10B981;">✓ 识别: "' + esc(bestText) + '" (' + bestScore + '%)</span>';
+        showActions(true);
+        doPass();
+      } else {
+        resultEl.innerHTML = '<span style="color:#EF4444;">✗ 识别: "' + esc(bestText) + '" (' + bestScore + '%)</span>';
+        showActions(false);
+        doFail();
+      }
+    };
+
+    recognition.onerror = function(event) {
+      micBtn.style.background = '#eef2ff';
+      micBtn.style.borderColor = 'var(--primary)';
+      micBtn.textContent = '🎙️';
+      if (event.error === 'no-speech') {
+        resultEl.textContent = '未检测到语音，请再试一次';
+      } else if (event.error === 'not-allowed') {
+        resultEl.textContent = '请允许使用麦克风';
+      } else {
+        resultEl.textContent = '识别失败，请重试';
+      }
+      showActions(false);
+    };
+
+    recognition.onend = function() {
+      micBtn.style.background = '#eef2ff';
+      micBtn.style.borderColor = 'var(--primary)';
+      micBtn.textContent = '🎙️';
+    };
+
+    recognition.start();
+  }
+
+  micBtn.addEventListener('click', startListening);
+  // Auto-start listening
+  setTimeout(function() { startListening(); }, 500);
+}
+
 function showQuiz(id) {
   var word = findWordById(id);
   if (!word) return;
@@ -1173,25 +1333,9 @@ function showQuiz(id) {
 
       if (chosen === correct) {
         this.classList.add('chosen-right');
-        // mastery counter (only goes up, never down)
-        if (!state.mastery) state.mastery = {};
-        state.mastery[id] = (state.mastery[id] || 0) + 1;
-        var stars = '';
-        for (var s = 0; s < Math.min(state.mastery[id], 5); s++) stars += '⭐';
-        feedback.innerHTML = '<span style="color:#10B981;">胡诗涵，你真棒！ ' + stars + ' (' + state.mastery[id] + '次)</span>';
-        state.learned[id] = true;
-        // remove from errors if corrected
-        if (state.errors && state.errors[id]) { delete state.errors[id]; }
-        saveState();
-        // speak after short delay
-        var w = word;
-        setTimeout(function() { speakWord(w.w, null, w.f, w.ph, w.m); }, 400);
-        setTimeout(function() {
-          var modal = document.getElementById('quizModal');
-          if (modal) modal.remove();
-          refreshAll();
-          if (currentTab === 'errors') renderErrors();
-        }, 1200);
+        feedback.innerHTML = '<span style="color:#10B981;">✓ 选择正确！请大声朗读这个单词</span>';
+        // Replace quiz options with pronunciation UI
+        showPronounceUI(id);
       } else {
         this.classList.add('chosen-wrong');
         // add to error notebook
