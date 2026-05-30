@@ -1,5 +1,5 @@
 // Service Worker for 初中英语词汇打卡 PWA
-var CACHE = 'vocab-v5';
+var CACHE = 'vocab-v6';
 
 self.addEventListener('install', function(e) {
   self.skipWaiting();
