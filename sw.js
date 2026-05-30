@@ -1,18 +1,7 @@
 // Service Worker for 初中英语词汇打卡 PWA
-var CACHE = 'vocab-v4';
-var FILES = [
-  'index.html',
-  'manifest.json',
-  'icon-192.png',
-  'icon-512.png',
-];
+var CACHE = 'vocab-v5';
 
 self.addEventListener('install', function(e) {
-  e.waitUntil(
-    caches.open(CACHE).then(function(cache) {
-      return cache.addAll(FILES);
-    })
-  );
   self.skipWaiting();
 });
 
@@ -23,12 +12,34 @@ self.addEventListener('activate', function(e) {
         keys.filter(function(k) { return k !== CACHE; })
             .map(function(k) { return caches.delete(k); })
       );
+    }).then(function() {
+      return self.clients.claim();
     })
   );
-  self.clients.claim();
+});
+
+self.addEventListener('message', function(e) {
+  if (e.data && e.data.action === 'skipWaiting') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('fetch', function(e) {
+  // Network-first for HTML, cache-first for static assets
+  if (e.request.mode === 'navigate' || e.request.destination === 'document') {
+    e.respondWith(
+      fetch(e.request).then(function(response) {
+        var clone = response.clone();
+        caches.open(CACHE).then(function(cache) {
+          cache.put(e.request, clone);
+        });
+        return response;
+      }).catch(function() {
+        return caches.match(e.request);
+      })
+    );
+    return;
+  }
   e.respondWith(
     caches.match(e.request).then(function(resp) {
       return resp || fetch(e.request).then(function(response) {

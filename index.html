@@ -481,37 +481,53 @@ body {
 <script>
 // ── PWA: service worker registration with update detection ────────
 if ('serviceWorker' in navigator) {
-  var refreshing = false;
-  navigator.serviceWorker.register('sw.js').then(function(registration) {
-    // Check for updates on each page load
-    registration.update();
+  function showUpdateBar(newWorker) {
+    var old = document.getElementById('swUpdateToast');
+    if (old) return; // already showing
+    var toast = document.createElement('div');
+    toast.id = 'swUpdateToast';
+    toast.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:14px 20px;border-radius:24px;font-size:14px;z-index:999;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.4);cursor:pointer;animation:toastIn .3s ease;';
+    toast.textContent = '🔄 新版本已就绪，点击更新';
+    toast.addEventListener('click', function() {
+      if (newWorker) {
+        newWorker.postMessage({ action: 'skipWaiting' });
+      }
+      toast.textContent = '⏳ 正在更新...';
+      setTimeout(function() { window.location.reload(); }, 800);
+    });
+    document.body.appendChild(toast);
+    // auto-hide after 30 seconds if not clicked
+    setTimeout(function() { if (toast.parentNode) toast.remove(); }, 30000);
+  }
 
-    registration.addEventListener('updatefound', function() {
-      var newWorker = registration.installing;
+  navigator.serviceWorker.register('sw.js').then(function(reg) {
+    // Case 1: SW already waiting (detected during navigation)
+    if (reg.waiting) {
+      showUpdateBar(reg.waiting);
+      return;
+    }
+
+    // Case 2: SW update found after registration
+    reg.addEventListener('updatefound', function() {
+      var newWorker = reg.installing;
+      if (!newWorker) return;
       newWorker.addEventListener('statechange', function() {
         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-          // New SW installed and waiting — show update prompt
-          var toast = document.createElement('div');
-          toast.id = 'swUpdateToast';
-          toast.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:14px 20px;border-radius:24px;font-size:14px;z-index:999;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.4);cursor:pointer;animation:toastIn .3s ease;';
-          toast.textContent = '🔄 新版本已就绪，点击更新';
-          toast.addEventListener('click', function() {
-            newWorker.postMessage({ action: 'skipWaiting' });
-            toast.textContent = '⏳ 正在更新...';
-            setTimeout(function() { window.location.reload(); }, 500);
-          });
-          document.body.appendChild(toast);
+          showUpdateBar(newWorker);
         }
       });
     });
+
+    // Check for updates
+    reg.update();
   });
 
-  // Handle the case where skipWaiting triggers a controller change
+  // Reload when new SW takes over
+  var refreshing = false;
   navigator.serviceWorker.addEventListener('controllerchange', function() {
-    if (!refreshing) {
-      refreshing = true;
-      window.location.reload();
-    }
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
   });
 }
 </script>
