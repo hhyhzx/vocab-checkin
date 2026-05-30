@@ -599,6 +599,30 @@ function showToast(msg) {
   setTimeout(function(){ el.remove(); }, 1800);
 }
 
+function showConfirm(msg, onOk) {
+  var html = '<div class="modal-mask" id="confirmModal">';
+  html += '<div class="modal-box" style="max-width:300px;">';
+  html += '<p style="font-size:15px;color:var(--text);margin:0 0 20px;">' + esc(msg) + '</p>';
+  html += '<div class="btn-row">';
+  html += '<button class="btn-ghost" id="confirmCancel">取消</button>';
+  html += '<button class="btn-primary" id="confirmOk" style="background:var(--danger);">确定</button>';
+  html += '</div></div></div>';
+  var container = document.createElement('div');
+  container.innerHTML = html;
+  document.body.appendChild(container.firstElementChild);
+
+  document.getElementById('confirmCancel').addEventListener('click', function() {
+    document.getElementById('confirmModal').remove();
+  });
+  document.getElementById('confirmOk').addEventListener('click', function() {
+    document.getElementById('confirmModal').remove();
+    onOk();
+  });
+  document.getElementById('confirmModal').addEventListener('click', function(e) {
+    if (e.target === this) this.remove();
+  });
+}
+
 function showConfetti() {
   var container = document.createElement('div');
   container.className = 'confetti-container';
@@ -859,13 +883,13 @@ function renderStats() {
   var resetBtn = document.getElementById('btnReset');
   if (resetBtn) {
     resetBtn.addEventListener('click', function() {
-      if (confirm('确定要清除所有学习记录吗？此操作不可恢复。')) {
-        state = { learned: {}, day: 0, mastery: state.mastery || {} };
+      showConfirm('确定要清除所有学习记录吗？此操作不可恢复。', function() {
+        state = { learned: {}, day: 0, mastery: state.mastery || {}, errors: state.errors || {} };
         saveState();
         switchTab('study');
         refreshAll();
-        showToast('学习记录已重置，掌握次数保留');
-      }
+        showToast('学习记录已重置，错题本和掌握次数保留');
+      });
     });
   }
 }
@@ -1238,13 +1262,13 @@ document.getElementById('btnRetryAll').addEventListener('click', function() {
 });
 document.getElementById('btnClearErrors').addEventListener('click', function() {
   var count = Object.keys(state.errors || {}).length;
-  if (count === 0) return;
-  if (confirm('确定要清空所有 ' + count + ' 道错题吗？')) {
+  if (count === 0) { showToast('没有错题可清空'); return; }
+  showConfirm('确定要清空所有 ' + count + ' 道错题吗？', function() {
     state.errors = {};
     saveState();
     renderErrors();
     showToast('错题本已清空');
-  }
+  });
 });
 
 // ── swipe support ────────────────────────────────────────────────
