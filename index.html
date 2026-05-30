@@ -563,7 +563,7 @@ function loadState() {
     var raw = localStorage.getItem('vc_state');
     if (raw) return JSON.parse(raw);
   } catch(e) {}
-  return { learned: {}, day: 0, mastery: {}, completedDates: {}, dayDurations: {}, errors: {} };
+  return { learned: {}, day: 0, mastery: {}, completedDates: {}, dayDurations: {}, errors: {}, points: 0, lastCompletedDate: '' };
 }
 
 function saveState() {
@@ -753,24 +753,61 @@ function renderProgress() {
   var pct = words.length > 0 ? Math.round(learned / words.length * 100) : 0;
 
   var timerEl = document.getElementById('headerTimer');
-  if (timerEl) timerEl.textContent = '';
+  if (timerEl) timerEl.textContent = '⭐ ' + (state.points || 0) + ' 积分';
   document.getElementById('progressFill').style.width = pct + '%';
   document.getElementById('progressText').textContent = '今日进度: ' + learned + '/' + words.length;
-  // celebrate if all done, record duration
+  // celebrate if all done, record duration, award points
   if (learned === words.length && words.length > 0) {
     if (!state.dayDurations) state.dayDurations = {};
     if (!state.dayDurations[state.day]) {
       state.dayDurations[state.day] = new Date().toLocaleString('zh-CN');
       state.completedDates = state.completedDates || {};
       state.completedDates[state.day] = new Date().toLocaleString('zh-CN');
+
+      // -- points system --
+      var today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      var ptsMsg = '';
+      if (!state.lastCompletedDate) {
+        // first time ever
+        state.points = (state.points || 0) + 10;
+        ptsMsg = ' +10积分';
+      } else if (state.lastCompletedDate === today) {
+        // already completed today, no change
+      } else {
+        var last = new Date(state.lastCompletedDate);
+        var curr = new Date(today);
+        var daysSince = Math.round((curr - last) / 86400000);
+        if (daysSince === 1) {
+          // consecutive: award 10
+          state.points = (state.points || 0) + 10;
+          ptsMsg = ' +10积分（连续打卡）';
+        } else if (daysSince > 1) {
+          // missed days penalty: 10+20+30+... per missed day
+          var missed = daysSince - 1;
+          var penalty = 0;
+          for (var p = 1; p <= missed; p++) { penalty += p * 10; }
+          state.points = Math.max(0, (state.points || 0) - penalty);
+          state.points += 10; // today's reward
+          ptsMsg = ' 连续打卡中断！扣' + penalty + '分，+10今日奖励';
+        }
+      }
+      if (daysSince !== 0) {
+        state.lastCompletedDate = today;
+      }
+      // protect against negative
+      if (state.points < 0) state.points = 0;
       saveState();
+
+      var toastMsg = '🎉 胡诗涵，今日任务全部完成！';
+      if (ptsMsg) toastMsg += '\n⭐ 当前积分：' + state.points + ' 分';
+      var finalMsg = toastMsg;
+      setTimeout(function() {
+        showConfetti();
+        showToast(finalMsg);
+      }, 300);
     }
     if (!window._celebratedDay) {
       window._celebratedDay = state.day;
-      setTimeout(function() {
-        showConfetti();
-        showToast('🎉 胡诗涵，今日任务全部完成！');
-      }, 300);
     }
   }
   if (learned < words.length) {
@@ -858,7 +895,12 @@ function renderStats() {
 
   html += '<div class="stat-row">';
   html += '<div class="stat-card"><div class="stat-big">' + completeDays + '</div><div class="stat-label">完成天数</div></div>';
+  html += '<div class="stat-card"><div class="stat-big">' + (state.points || 0) + ' ⭐</div><div class="stat-label">当前积分</div></div>';
+  html += '</div>';
+
+  html += '<div class="stat-row">';
   html += '<div class="stat-card"><div class="stat-big">' + (streak || 0) + ' 🔥</div><div class="stat-label">连续打卡</div></div>';
+  html += '<div class="stat-card"><div class="stat-big" style="font-size:14px;color:var(--text2);">📋 规则</div><div class="stat-label" style="font-size:12px;">每日+10分 | 断签扣分递增<br>中断1天-10 2天-30 3天-60...</div></div>';
   html += '</div>';
 
   // day grid
