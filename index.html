@@ -472,12 +472,6 @@ body {
 <!-- toast container -->
 <div id="toastContainer"></div>
 
-<!-- iOS install tip -->
-<div id="installTip" style="display:none;position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:12px 20px;border-radius:24px;font-size:13px;z-index:150;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.3);">
-  点击 <span style="font-size:16px;">📤</span> 分享 → <b>添加到主屏幕</b> 即可安装
-  <button onclick="this.parentElement.style.display='none'" style="background:none;border:none;color:#94a3b8;margin-left:12px;font-size:16px;cursor:pointer;">✕</button>
-</div>
-
 <script>
 // ── PWA: service worker registration with update detection ────────
 if ('serviceWorker' in navigator) {
@@ -530,25 +524,6 @@ if ('serviceWorker' in navigator) {
     window.location.reload();
   });
 }
-</script>
-
-// ── iOS install tip ──────────────────────────────────────────────
-(function() {
-  var isIOS = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
-  var isStandalone = window.navigator.standalone;
-  if (isIOS && !isStandalone && !localStorage.getItem('vc_ios_tip_dismissed')) {
-    setTimeout(function() {
-      document.getElementById('installTip').style.display = 'block';
-    }, 2000);
-  }
-  // dismiss permanently
-  var tip = document.getElementById('installTip');
-  if (tip) {
-    tip.querySelector('button').addEventListener('click', function() {
-      localStorage.setItem('vc_ios_tip_dismissed', '1');
-    });
-  }
-})();
 </script>
 
 <script>
@@ -1126,18 +1101,14 @@ function switchTab(tab) {
   document.getElementById('allWordsWrap').style.display = showAll ? '' : 'none';
   document.getElementById('errorsWrap').style.display = showErrors ? '' : 'none';
 
-  // Toggle iOS install tip: only show on study tab
-  var tip = document.getElementById('installTip');
-  if (tip) {
-    var dismissed = localStorage.getItem('vc_ios_tip_dismissed');
-    tip.style.display = (showStudy && !dismissed) ? 'block' : 'none';
-  }
-
-  if (showStats) renderStats();
+  if (showErrors) renderErrors();
+  if (showStudy) refreshAll();
+}
   if (showAll) {
     var activeFilter = document.querySelector('.filter-chip.active');
     renderAllWords(activeFilter ? activeFilter.getAttribute('data-filter') : 'all');
   }
+  if (showStats) renderStats();
   if (showErrors) renderErrors();
   if (showStudy) refreshAll();
 }
