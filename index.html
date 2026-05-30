@@ -626,7 +626,7 @@ function showConfetti() {
 }
 
 // ── TTS (voice) ──────────────────────────────────────────────────
-function speakWord(word, btn, forms, phrases, meaning) {
+function speakWord(word, btn, forms, phrases, meaning, ipa) {
   if (!window.speechSynthesis) {
     showToast('你的浏览器不支持语音朗读');
     return;
@@ -638,6 +638,7 @@ function speakWord(word, btn, forms, phrases, meaning) {
 
   // Build a queue of utterances: word → meaning → forms → phrase1 → phrase1_zh → ...
   var queue = [];
+  var overlayLabel = word;
 
   // 1) word (en)
   queue.push({ text: word, lang: 'en-GB', rate: 0.75 });
@@ -668,6 +669,24 @@ function speakWord(word, btn, forms, phrases, meaning) {
     }
   }
 
+  // Format IPA for display: clean up /.../ and highlight syllables
+  var ipaHtml = '';
+  if (ipa && ipa.trim()) {
+    var raw = ipa.replace(/^\//, '').replace(/\/$/, '').trim();
+    // Color each syllable segment: stress mark + letters
+    ipaHtml = '<span style="color:#ef4444;font-size:16px;margin-top:4px;display:block;">';
+    for (var ci = 0; ci < raw.length; ci++) {
+      var ch = raw[ci];
+      if (ch === 'ˈ' || ch === 'ˌ') {
+        // Stress marks: primary ˈ or secondary ˌ — bold red
+        ipaHtml += '<b style="color:#dc2626;">' + ch + '</b>';
+      } else {
+        ipaHtml += ch;
+      }
+    }
+    ipaHtml += '</span>';
+  }
+
   // floating overlay for speech text
   var overlay = document.getElementById('speechOverlay');
   if (!overlay) {
@@ -677,18 +696,18 @@ function speakWord(word, btn, forms, phrases, meaning) {
     document.body.appendChild(overlay);
   }
   overlay.style.opacity = '1';
-  overlay.textContent = '';
+  overlay.innerHTML = '';
 
   function speakNext(idx) {
     if (idx >= queue.length) {
       window._speaking = false;
       if (btn) btn.classList.remove('speaking');
       overlay.style.opacity = '0';
-      setTimeout(function() { overlay.textContent = ''; }, 300);
+      setTimeout(function() { overlay.innerHTML = ''; }, 300);
       return;
     }
     var item = queue[idx];
-    overlay.textContent = item.text;
+    overlay.innerHTML = '<span>' + esc(item.text) + '</span>' + (idx === 0 && ipaHtml ? ipaHtml : '');
     var utter = new SpeechSynthesisUtterance(item.text);
     utter.lang = item.lang;
     utter.rate = item.rate;
@@ -837,7 +856,7 @@ function renderWordList() {
       e.stopPropagation();
       var id = this.closest('.word-card').getAttribute('data-id');
       var word = findWordById(id);
-      speakWord(this.getAttribute('data-word'), this, word ? word.f : '', word ? word.ph : null, word ? word.m : '');
+      speakWord(this.getAttribute('data-word'), this, word ? word.f : '', word ? word.ph : null, word ? word.m : '', word ? word.ipa : '');
     });
   }
 }
@@ -990,7 +1009,7 @@ function renderAllWords(filter) {
       e.stopPropagation();
       var id = this.closest('.word-card').getAttribute('data-id');
       var word = findWordById(id);
-      speakWord(this.getAttribute('data-word'), this, word ? word.f : '', word ? word.ph : null, word ? word.m : '');
+      speakWord(this.getAttribute('data-word'), this, word ? word.f : '', word ? word.ph : null, word ? word.m : '', word ? word.ipa : '');
     });
   }
 }
@@ -1047,7 +1066,7 @@ function renderErrors() {
       e.stopPropagation();
       var id = this.closest('.word-card').getAttribute('data-id');
       var word = findWordById(id);
-      speakWord(this.getAttribute('data-word'), this, word ? word.f : '', word ? word.ph : null, word ? word.m : '');
+      speakWord(this.getAttribute('data-word'), this, word ? word.f : '', word ? word.ph : null, word ? word.m : '', word ? word.ipa : '');
     });
   }
 }
@@ -1185,7 +1204,7 @@ function showQuiz(id) {
         saveState();
         // speak after short delay
         var w = word;
-        setTimeout(function() { speakWord(w.w, null, w.f, w.ph, w.m); }, 400);
+        setTimeout(function() { speakWord(w.w, null, w.f, w.ph, w.m, w.ipa); }, 400);
         setTimeout(function() {
           var modal = document.getElementById('quizModal');
           if (modal) modal.remove();
@@ -1201,7 +1220,7 @@ function showQuiz(id) {
         feedback.innerHTML = '<span style="color:#EF4444;">已加入错题本 (错误' + state.errors[id] + '次) | 正确答案：' + esc(correct) + '</span>';
         // speak the correct word
         var w = word;
-        setTimeout(function() { speakWord(w.w, null, null, null, w.m); }, 300);
+        setTimeout(function() { speakWord(w.w, null, null, null, w.m, w.ipa); }, 300);
         setTimeout(function() {
           var modal = document.getElementById('quizModal');
           if (modal) modal.remove();
