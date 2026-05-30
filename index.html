@@ -1095,9 +1095,6 @@ function switchTab(tab) {
   document.getElementById('allWordsWrap').style.display = showAll ? '' : 'none';
   document.getElementById('errorsWrap').style.display = showErrors ? '' : 'none';
 
-  if (showErrors) renderErrors();
-  if (showStudy) refreshAll();
-}
   if (showAll) {
     var activeFilter = document.querySelector('.filter-chip.active');
     renderAllWords(activeFilter ? activeFilter.getAttribute('data-filter') : 'all');
