@@ -180,6 +180,7 @@ body {
 }
 .speaker-btn:active { background: var(--primary); color:#fff; transform:scale(.9); }
 .speaker-btn.speaking { background: var(--primary); color:#fff; animation: pulse .6s infinite; }
+.speaker-btn.speaker-disabled { opacity:.35; pointer-events:none; cursor:not-allowed; }
 @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
 
 /* batch button */
@@ -877,7 +878,7 @@ function renderWordList() {
       html += '<div class="word-zh-hidden">🔒 点击答题查看释义</div>';
     }
     html += '</div>';
-    html += '<button class="speaker-btn" data-word="' + esc(w.w) + '" title="朗读">🔊</button>';
+    html += '<button class="speaker-btn' + (learned ? '' : ' speaker-disabled') + '" data-word="' + esc(w.w) + '" title="' + (learned ? '朗读' : '打卡通过后可朗读') + '">🔊</button>';
     html += '</div>';
   }
   document.getElementById('wordList').innerHTML = html || '<div class="empty"><div class="icon">📭</div>暂无词汇</div>';
@@ -895,6 +896,8 @@ function renderWordList() {
     spks[k].addEventListener('click', function(e) {
       e.stopPropagation();
       var id = this.closest('.word-card').getAttribute('data-id');
+      var learned = !!state.learned[id];
+      if (!learned) { showToast('请先打卡通过再朗读'); return; }
       var word = findWordById(id);
       speakWord(this.getAttribute('data-word'), this, word ? word.f : '', word ? word.ph : null, word ? word.m : '', word ? word.ipa : '');
     });
@@ -1027,7 +1030,7 @@ function renderAllWords(filter) {
       html += '<div class="word-zh-hidden">🔒 点击答题查看释义</div>';
     }
     html += '</div>';
-    html += '<button class="speaker-btn" data-word="' + esc(w.w) + '" title="朗读">🔊</button>';
+    html += '<button class="speaker-btn' + (learned ? '' : ' speaker-disabled') + '" data-word="' + esc(w.w) + '" title="' + (learned ? '朗读' : '打卡通过后可朗读') + '">🔊</button>';
     html += '</div>';
   }
   document.getElementById('allWordList').innerHTML =
@@ -1048,6 +1051,8 @@ function renderAllWords(filter) {
     spks[k].addEventListener('click', function(e) {
       e.stopPropagation();
       var id = this.closest('.word-card').getAttribute('data-id');
+      var learned = !!state.learned[id];
+      if (!learned) { showToast('请先打卡通过再朗读'); return; }
       var word = findWordById(id);
       speakWord(this.getAttribute('data-word'), this, word ? word.f : '', word ? word.ph : null, word ? word.m : '', word ? word.ipa : '');
     });
