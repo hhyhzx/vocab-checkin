@@ -952,6 +952,9 @@ function renderStats() {
   html += '<div style="text-align:center;margin-top:16px;">';
   html += '<button style="border:none;background:none;color:#94a3b8;font-size:12px;cursor:pointer;padding:8px;" id="btnReset">重置全部数据</button>';
   html += '</div>';
+  html += '<div style="text-align:center;margin-top:4px;">';
+  html += '<button style="border:none;background:none;color:#f59e0b;font-size:12px;cursor:pointer;padding:8px;" id="btnRestore5">🔄 恢复5天打卡记录</button>';
+  html += '</div>';
 
   // export / import buttons
   html += '<div style="text-align:center;margin-top:8px;display:flex;gap:12px;justify-content:center;">';
@@ -1040,6 +1043,35 @@ function renderStats() {
       };
       reader.readAsText(file);
       importFile.value = '';
+    });
+  }
+
+  // restore 5 days button
+  var restore5Btn = document.getElementById('btnRestore5');
+  if (restore5Btn) {
+    restore5Btn.addEventListener('click', function() {
+      showConfirm('确定要恢复5天打卡记录吗？\n\n将恢复前150个单词为已学状态\n积分: 50 | 连续打卡: 5天 | 错题本: 空', function() {
+        var today = new Date().toISOString().slice(0, 10);
+        for (var i = 1; i <= 150; i++) {
+          state.learned[String(i)] = true;
+          state.mastery[String(i)] = 1;
+        }
+        for (var d = 0; d < 5; d++) {
+          var dd = new Date();
+          dd.setDate(dd.getDate() - (4 - d));
+          state.completedDates[String(d)] = dd.toISOString().slice(0, 10);
+          state.dayDurations[String(d)] = dd.toISOString().slice(0, 10);
+        }
+        state.errors = {};
+        state.points = 50;
+        state.lastCompletedDate = today;
+        state.streakDays = 5;
+        state.day = 4;
+        saveState();
+        switchTab('study');
+        refreshAll();
+        showToast('✅ 5天打卡记录已恢复！');
+      });
     });
   }
 }
